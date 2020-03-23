@@ -12,6 +12,8 @@ parser.add_argument('url')
 parser.add_argument('-d', '--data')
 parser.add_argument('-b', '--data-binary', default=None)
 parser.add_argument('-L', '--location', action='store_true')
+parser.add_argument('-F', '--form', action='append', default=[])
+parser.add_argument('--data-urlencoded', action='append', default=[])
 parser.add_argument('-X', default='')
 parser.add_argument('-H', '--header', action='append', default=[])
 parser.add_argument('--compressed', action='store_true')
@@ -27,7 +29,7 @@ def parse_context(curl_command):
     tokens = shlex.split(curl_command)
     parsed_args = parser.parse_args(tokens)
 
-    post_data = parsed_args.data or parsed_args.data_binary
+    post_data = parsed_args.data or parsed_args.data_binary or parsed_args.data_urlencoded or parsed_args.form
     if post_data:
         method = 'post'
 
@@ -36,6 +38,16 @@ def parse_context(curl_command):
 
     cookie_dict = OrderedDict()
     quoted_headers = OrderedDict()
+
+    if len(parsed_args.data_urlencoded) > 0 :
+        data_dict = OrderedDict()
+        for curl_param in post_data :
+            param_header, param_value = curl_param.split("=",1)
+            data_dict[param_header] = param_value.strip()
+        post_data = data_dict
+    elif len (parsed_args.form) > 0:
+        post_data = '&'.join(post_data)
+
 
     for curl_header in parsed_args.header:
         if curl_header.startswith(':'):
@@ -66,7 +78,10 @@ def parse(curl_command, **kargs):
 
     data_token = ''
     if parsed_context.data:
-        data_token = '{}data=\'{}\',\n'.format(BASE_INDENT, parsed_context.data)
+        if isinstance(parsed_context.data, str) :
+            data_token = '{}data=\'{}\',\n'.format(BASE_INDENT, parsed_context.data)
+        else :
+            data_token = "{}data={},\n".format(BASE_INDENT, dict_to_pretty_string(parsed_context.data))
 
     verify_token = ''
     if parsed_context.verify:
